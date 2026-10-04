@@ -1,0 +1,6 @@
+import bcrypt from 'bcryptjs'; import {SignJWT,jwtVerify} from 'jose'; import {cookies} from 'next/headers'; import {db} from '@/lib/db/prisma';
+const secret=new TextEncoder().encode(process.env.CHATNEX_SESSION_SECRET||'development-only-secret-change-me');
+export async function ensureAdmin(){const email=process.env.ADMIN_EMAIL,password=process.env.ADMIN_PASSWORD;if(!email||!password)return;const existing=await db.admin.findUnique({where:{email}});if(!existing)await db.admin.create({data:{email,passwordHash:await bcrypt.hash(password,12)}})}
+export async function login(email:string,password:string){await ensureAdmin();const admin=await db.admin.findUnique({where:{email}});if(!admin||!(await bcrypt.compare(password,admin.passwordHash)))return false;const token=await new SignJWT({sub:admin.id,email:admin.email}).setProtectedHeader({alg:'HS256'}).setExpirationTime('8h').sign(secret);(await cookies()).set('chatnex_admin',token,{httpOnly:true,sameSite:'lax',secure:process.env.NODE_ENV==='production',maxAge:28800,path:'/'});return true}
+export async function isAdmin(){const token=(await cookies()).get('chatnex_admin')?.value;if(!token)return false;try{await jwtVerify(token,secret);return true}catch{return false}}
+export async function logout(){(await cookies()).delete('chatnex_admin')}
