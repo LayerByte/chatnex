@@ -1,102 +1,160 @@
 # ChatNex
 
-Modern, self-hostable and embeddable website chatbot platform built with Next.js, TypeScript, React, Tailwind CSS, Prisma and SQLite.
+> Self-hosted embeddable AI chatbot for websites, portfolios, documentation, SaaS products, and online services.
 
-## Overview
-ChatNex provides a floating chatbot widget, anonymous visitor sessions, configurable AI providers, local keyword retrieval, FAQs, admin authentication, analytics and a lightweight embed script.
+ChatNex is a production-minded chatbot platform built with Next.js, TypeScript, React, Tailwind CSS, Prisma, SQLite, and Zod. It provides a lightweight website widget, anonymous visitor sessions, configurable AI providers, local knowledge retrieval, FAQs, analytics, and a protected admin console.
 
-## Features
-- Floating responsive chat widget
-- Demo/mock AI mode with no API key
+## Highlights
+
+- Embeddable JavaScript widget — no React required on the host website
+- Local demo mode — works without an external AI API key
 - OpenAI-compatible provider abstraction
-- Website knowledge base and FAQ retrieval
-- Anonymous visitor sessions
-- Conversation storage toggle
-- Admin dashboard and protected APIs
-- Analytics events
-- Zod input validation
-- Basic in-memory rate limiting
-- Accessible keyboard-first controls
-- Light/dark-ready appearance configuration
+- Website-specific knowledge base with weighted keyword retrieval
+- FAQ matching
+- Anonymous visitor/session management
+- Optional conversation persistence
+- Admin authentication with hashed passwords and signed HttpOnly sessions
+- Widget appearance, welcome message, quick actions, and system prompt settings
+- Conversation viewer and deletion
+- Analytics events and knowledge-match tracking
+- Public widget configuration that never exposes the system prompt or server secrets
+- Zod validation and public chat rate limiting
+- Mobile-responsive, keyboard-friendly interface
+- SQLite + Prisma for simple local/self-hosted deployments
 
-## Architecture
-`components/chat` contains public UI. `app/api` contains server endpoints. `lib/ai` isolates AI providers, `lib/knowledge` handles retrieval, Prisma owns persistence, and `lib/auth` protects administration.
+## Stack
+
+Next.js 15 · TypeScript · React 19 · Tailwind CSS 4 · Prisma 6 · SQLite · Zod · JOSE · bcryptjs · Vitest
+
+## Requirements
+
+- Node.js 20.9+
+- npm
 
 ## Installation
-Requirements: Node.js 20.9+.
 
 ```bash
 cp .env.example .env
 npm install
 npx prisma generate
-npx prisma migrate dev --name init
+npx prisma migrate dev
+npx prisma db seed
 npm run dev
 ```
 
 Open `http://localhost:3000`.
 
-## Environment Variables
-See `.env.example`. Never expose `AI_API_KEY`, database credentials or server secrets to browser code.
+The demo widget is available on the home page. The admin console is at `/admin`.
 
 ## Demo Mode
-If `AI_API_KEY` is empty, ChatNex automatically uses the local mock provider. Seed the demo data with:
 
-```bash
-npx prisma db seed
-```
+ChatNex automatically uses the local mock provider when `AI_API_KEY` is empty. This lets you test the widget, sessions, knowledge retrieval, FAQs, persistence, and admin dashboard without an external AI service.
 
-Default admin credentials come from `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env`. Change them before deployment.
+## Admin
+
+Set `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `CHATNEX_SESSION_SECRET` in `.env`. The first successful login creates the configured admin account if it does not already exist.
+
+Use a strong random password and a unique session secret in production.
 
 ## AI Provider
-The provider interface lives in `lib/ai/provider.ts`. The included provider uses an OpenAI-compatible `/chat/completions` endpoint. Replace or extend `lib/ai` without coupling the widget to a vendor.
 
-## Knowledge Base and FAQ
-Knowledge entries use title, category, content, keywords and enabled state. Retrieval is intentionally simple: normalized keyword, title and category scoring. This keeps local development lightweight while leaving a clean boundary for future semantic search.
+The provider contract is defined in `lib/ai/provider.ts`. The included OpenAI-compatible implementation reads its credentials only on the server:
 
-## Embedding ChatNex
-For a deployed instance:
-
-```html
-<script src="https://example.com/chatnex.js" data-chatnex-id="demo"></script>
+```env
+AI_API_KEY="..."
+AI_MODEL="gpt-4o-mini"
+AI_API_URL="https://api.openai.com/v1/chat/completions"
 ```
 
-For local testing:
+The browser never receives `AI_API_KEY` or the server environment.
+
+## Embedding
+
+Add one script to another website:
+
+```html
+<script
+  src="https://your-chatnex-domain.example/chatnex.js"
+  data-chatnex-id="demo">
+</script>
+```
+
+For local development:
 
 ```html
 <script src="http://localhost:3000/chatnex.js" data-chatnex-id="demo"></script>
 ```
 
-Production deployments should use HTTPS. The embed script creates a lightweight iframe and does not require React on the host website.
+The loader creates an iframe, so the host website does not need React, Next.js, or ChatNex dependencies. The iframe is served from the ChatNex origin and keeps the host page isolated from the widget UI.
+
+Use HTTPS in production.
 
 ## API
-- `POST /api/chat`
-- `POST/GET/PUT/DELETE /api/conversations`
+
+Public:
+
+- `POST /api/chat` — send a visitor message
+- `GET /api/widget?id=demo` — retrieve safe public widget configuration
+- `GET /api/health` — application/database health check
+
+Admin-authenticated:
+
+- `POST /api/auth` — login/logout
+- `GET /api/analytics`
+- `GET/DELETE /api/conversations`
 - `GET/POST/PUT/DELETE /api/knowledge`
 - `GET/POST/PUT/DELETE /api/faqs`
-- `GET /api/analytics`
 - `GET/PUT /api/settings`
-- `POST /api/auth`
+- `PUT /api/widget`
 
-Admin endpoints require the HttpOnly admin session cookie.
+All mutation inputs are validated server-side.
 
-## Admin Dashboard
-Visit `/admin`. The dashboard exposes overview metrics and knowledge/FAQ views. The API is intentionally modular so additional editor screens can be added without changing the public widget.
+## Knowledge Retrieval
 
-## Security
-All public chat messages are validated and limited to 4000 characters. Basic per-visitor rate limiting returns HTTP 429. Admin APIs require a signed session cookie. Passwords are hashed with bcrypt. AI keys remain server-side. User input is treated as untrusted context and is never allowed to rewrite the configured system instructions.
+ChatNex intentionally uses a simple local retrieval engine instead of requiring a vector database. It normalizes text and scores title, category, content, and keywords. The retrieval boundary is isolated in `lib/knowledge/search.ts`, making a future semantic/vector implementation straightforward.
 
 ## Privacy
-ChatNex does not require visitor accounts and does not intentionally store IP addresses. Website operators can disable conversation persistence. Operators remain responsible for their privacy policy, retention, consent requirements, AI provider terms and applicable data protection laws. ChatNex does not claim automatic GDPR compliance.
+
+Visitors do not need accounts. ChatNex does not intentionally store IP addresses. Conversation persistence can be disabled from the admin settings; when disabled, the API does not create a database conversation or message record.
+
+Website operators remain responsible for privacy notices, consent, retention policies, AI provider terms, and applicable data protection laws. ChatNex does not claim automatic GDPR compliance.
+
+## Security
+
+The project includes:
+
+- server-side environment secrets
+- hashed admin passwords
+- signed HttpOnly admin sessions
+- strict request validation
+- public chat rate limiting
+- message length limits
+- safe public widget configuration
+- no arbitrary HTML rendering in chat messages
+- security response headers
+- widget/conversation ownership checks
+- generic public error messages
+
+The in-memory rate limiter is intentionally simple and suitable for local/single-instance deployments. Use a shared limiter such as Redis for horizontally scaled production deployments.
 
 ## Testing
+
 ```bash
+npm run typecheck
 npm test
 ```
 
-The included tests cover knowledge ranking and input validation. The API design keeps the remaining integration surfaces isolated for extension.
+## Production checklist
 
-## Deployment
-Build with `npm run build` and serve with `npm start`. Use HTTPS, a strong `CHATNEX_SESSION_SECRET`, a production database strategy, strong admin credentials, and an appropriate AI provider configuration. SQLite is intended for local/self-hosted starter deployments; use a production-grade database when your workload requires it.
+1. Use HTTPS.
+2. Replace the example admin password.
+3. Generate a random `CHATNEX_SESSION_SECRET` of at least 32 characters.
+4. Keep `AI_API_KEY` server-side.
+5. Review conversation retention and privacy requirements.
+6. Replace SQLite with a production database if your deployment requires concurrent/high-volume workloads.
+7. Use a distributed rate limiter when running multiple instances.
+8. Review the AI provider's data-processing terms.
 
 ## Disclaimer
-ChatNex is a software project. Website owners are responsible for security, privacy, consent, data retention, AI provider usage and applicable laws.
+
+ChatNex is provided as a software project. Operators are responsible for configuring it securely and complying with applicable laws, privacy requirements, retention policies, and third-party AI provider terms.
