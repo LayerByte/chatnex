@@ -1,2 +1,0 @@
-import {NextResponse} from 'next/server';import {login,logout} from '@/lib/auth/auth';
-export async function POST(req:Request){const b=await req.json();if(b.action==='logout'){await logout();return NextResponse.json({ok:true})}if(typeof b.email!=='string'||typeof b.password!=='string')return NextResponse.json({error:'Invalid credentials.'},{status:400});if(!await login(b.email,b.password))return NextResponse.json({error:'Invalid credentials.'},{status:401});return NextResponse.json({ok:true})}
