@@ -1,3 +1,0 @@
-export type SearchItem={title:string;category:string;content:string;keywords?:string};
-const normalize=(s:string)=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s]/g,' ');
-export function searchKnowledge(query:string,items:SearchItem[],limit=5){const q=normalize(query).split(/\s+/).filter(Boolean);return items.map(item=>{const hay=normalize(`${item.title} ${item.category} ${item.content} ${item.keywords||''}`);let score=0;for(const word of q){if(hay.includes(word))score++;if(normalize(item.title).includes(word))score+=2;if(normalize(item.keywords||'').includes(word))score+=3}return {...item,score}}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,limit)}
