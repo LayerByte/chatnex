@@ -1,3 +1,0 @@
-import {NextResponse} from 'next/server';import {db} from '@/lib/db/prisma';import {isAdmin} from '@/lib/auth/auth';
-export async function GET(req:Request){if(!await isAdmin())return NextResponse.json({error:'Unauthorized'},{status:401});const u=new URL(req.url),q=u.searchParams.get('q')||'';const rows=await db.conversation.findMany({where:q?{OR:[{id:{contains:q}},{visitorId:{contains:q}}]}:undefined,include:{messages:true},orderBy:{updatedAt:'desc'},take:100});return NextResponse.json(rows)}
-export async function DELETE(req:Request){if(!await isAdmin())return NextResponse.json({error:'Unauthorized'},{status:401});const {id}=await req.json();await db.conversation.delete({where:{id}});return NextResponse.json({ok:true})}
